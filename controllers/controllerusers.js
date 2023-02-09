@@ -1,4 +1,5 @@
 const { decodeToken, encodeToken } = require('../helpers/jwt');
+const { descryptPass, encryptPass } = require('../helpers/bcrypt');
 const { mailer, mailercode } = require('../helpers/mailer');
 const { User, Token } = require('../models');
 const { Op } = require('sequelize');
@@ -31,6 +32,7 @@ class ControllerUsers {
       if (!password || password == '') throw { name: 'invalid_password' };
       const resLogin = await User.findOne({ where: { email } });
       if (!resLogin) throw { name: 'invalid' };
+      if (!descryptPass(password, resLogin.password)) throw { name: 'invalid' };
       const Token = encodeToken({ id: resLogin.id });
       res.status(200).json({ access_token: Token, username: resLogin.username, role: resLogin.role });
     } catch (error) {
@@ -149,10 +151,11 @@ class ControllerUsers {
   static async forReset(req, res, next) {
     try {
       const { email, password } = req.body;
+      const pass = encryptPass(password);
       const code = req.body.token;
       const trueToken = await Token.findOne({ where: { code, email, status: false } });
       if (!trueToken) throw { name: 'invalidToken' };
-      const updatePassword = await User.update({ password: password }, { where: { email } });
+      const updatePassword = await User.update({ password: pass }, { where: { email } });
       const updataToken = await Token.update({ status: true }, { where: { email } });
       res.status(200).json({ message: 'success update password' });
     } catch (error) {
